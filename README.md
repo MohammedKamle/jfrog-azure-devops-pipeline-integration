@@ -355,7 +355,7 @@ Trigger by pushing a commit to GitHub, or click **Run pipeline** in Azure DevOps
 | 1 | **Install JFrog CLI & Tools** (`JFrogToolsInstaller`) | CLI downloaded from `jfrog-cli-remote` and available on the agent |
 | 2 | **Audit Project Dependencies (Xray)** (`JFrogAudit`) | Shift-left scan against watch `security-watch-dev` |
 | 3 | **NPM Install & Collect Build Info** (`JFrogNpm`) | Dependencies resolved from `demo-npm`; build info collected locally |
-| 4 | **Collect Tracked Issues** (`JFrogCollectBuildIssues`) | JIRA-style keys scraped from commit messages into build info |
+| 4 | **Collect Tracked Issues** (`JFrogCollectIssues`) | JIRA-style keys scraped from commit messages into build info |
 | 5 | **Publish Build Info to Artifactory** (`JFrogPublishBuildInfo`) | Build appears under Artifactory → Builds |
 | 6 | **Scan Published Build (Xray)** (`JFrogBuildScan`) | Xray scans the published build; may fail the job if `allowFailBuild` + violations |
 

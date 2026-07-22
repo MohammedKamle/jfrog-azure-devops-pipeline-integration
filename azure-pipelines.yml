@@ -62,14 +62,15 @@ steps:
       includeEnvVars: true
 
   # 4. Extract and Collect Issues
-  - task: JFrogCollectBuildIssues@1
+  # Task ID is JFrogCollectIssues (friendly name: "JFrog Collect Build Issues")
+  - task: JFrogCollectIssues@1
     displayName: 'Collect Tracked Issues'
     inputs:
       artifactoryConnection: '$(jfrogPlatformConnection)'
       buildName: '$(buildName)'
       buildNumber: '$(buildNumber)'
       configSource: 'taskConfiguration'
-      cliIssuesConfig: |
+      taskConfig: |
         version: 1
         issues:
           trackerName: JIRA
