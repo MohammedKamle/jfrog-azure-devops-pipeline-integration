@@ -1,4 +1,4 @@
-# JFrog + Azure DevOps Pipeline Integration Demo
+# JFrog<=>Azure DevOps Pipeline Integration Demo
 
 Production-ready demo that builds a Node.js (Express) application in **Azure DevOps**, resolves npm packages through **JFrog Artifactory**, and scans the build with **JFrog Xray** using the official **JFrog Azure DevOps Extension**.
 
