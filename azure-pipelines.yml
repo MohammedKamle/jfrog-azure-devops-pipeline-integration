@@ -85,6 +85,7 @@ steps:
   - task: JFrogPublishBuildInfo@1
     displayName: 'Publish Build Info to Artifactory'
     inputs:
+      artifactoryConnection: '$(jfrogPlatformConnection)'
       buildName: '$(buildName)'
       buildNumber: '$(buildNumber)'
       excludeEnvVars: '*password*;*psw*;*secret*;*key*;*token*;*auth*;'

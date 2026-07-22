@@ -76,7 +76,7 @@ if [[ "${CLI_HTTP}" == "200" ]]; then
 else
   echo "WARNING: jfrog-cli-remote returned HTTP ${CLI_HTTP}."
   echo "Create a generic remote repo named jfrog-cli-remote pointing to:"
-  echo "  https://releases.jfrog.io/artifactory/jfrog-cli/"
+  echo "  https://releases.jfrog.io/artifactory/jfrog-cli/v2-jf/"
 fi
 rm -f /tmp/jfrog-cli-repo.json
 
