@@ -22,6 +22,16 @@ This repository is a customer-demo blueprint. Push it to GitHub, wire it to Azur
 
 The sample app is intentionally small so demos stay focused on the JFrog + Azure DevOps integration, not application complexity.
 
+> **Security demo (`develop` branch):** the `develop` branch intentionally pins npm dependencies with **known Critical CVEs** so the **Xray Build Scan** stage surfaces policy violations against `security-watch-dev`. The `main` branch stays clean. Use `develop` to demonstrate shift-left security failing a build.
+>
+> | Package | Version | Example CVE | Severity |
+> |---------|---------|-------------|----------|
+> | `lodash` | `4.17.11` | CVE-2019-10744 (prototype pollution) | Critical |
+> | `minimist` | `1.2.0` | CVE-2021-44906 (prototype pollution) | Critical |
+> | `handlebars` | `4.0.11` | CVE-2019-19919 (prototype pollution) | Critical |
+> | `node-serialize` | `0.0.4` | CVE-2017-5941 (RCE via deserialization) | Critical |
+> | `growl` | `1.9.2` | CVE-2017-16042 (command injection) | Critical |
+
 ---
 
 ## 2. Architecture Diagram
