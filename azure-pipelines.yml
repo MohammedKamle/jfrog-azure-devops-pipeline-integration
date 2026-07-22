@@ -1,0 +1,98 @@
+# Node.js Azure DevOps CI pipeline with JFrog Artifactory + Xray
+#
+# Triggers automatically on every push to the connected GitHub repository.
+# Configure these Azure DevOps pipeline variables (or variable group):
+#   - jfrogPlatformConnection  → name of the JFrog Platform service connection
+#   - jfrogXrayConnection      → name of the JFrog Xray service connection
+#   - buildName                → Artifactory build name (e.g. jfrog-azure-devops-demo)
+#   - buildNumber              → Artifactory build number (often $(Build.BuildId))
+
+trigger:
+  branches:
+    include:
+      - main
+      - master
+      - develop
+
+pr:
+  branches:
+    include:
+      - main
+      - master
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  # Override these in Azure DevOps → Pipelines → Edit → Variables
+  # Service connection names must match exactly what you configured in Project Settings.
+  jfrogPlatformConnection: 'jfrog-platform'
+  jfrogXrayConnection: 'jfrog-xray'
+  buildName: 'jfrog-azure-devops-demo'
+  # Prefer the Azure DevOps build ID so every run gets a unique Artifactory build number
+  buildNumber: '$(Build.BuildId)'
+
+steps:
+  # 1. Install JFrog CLI and Tools
+  - task: JFrogToolsInstaller@1
+    displayName: 'Install JFrog CLI & Tools'
+    inputs:
+      artifactoryConnection: '$(jfrogPlatformConnection)'
+      cliInstallationRepo: 'jfrog-cli-remote'
+
+  # 2. Shift-Left Security: Audit Local Dependencies
+  - task: JFrogAudit@1
+    displayName: 'Audit Project Dependencies (Xray)'
+    inputs:
+      xrayConnection: '$(jfrogXrayConnection)'
+      watchesSource: 'watches'
+      watches: 'security-watch-dev'
+      allowFailBuild: true
+
+  # 3. Build & Resolve Dependencies
+  - task: JFrogNpm@1
+    displayName: 'NPM Install & Collect Build Info'
+    inputs:
+      command: 'install'
+      artifactoryConnection: '$(jfrogPlatformConnection)'
+      sourceRepo: 'demo-npm'
+      collectBuildInfo: true
+      buildName: '$(buildName)'
+      buildNumber: '$(buildNumber)'
+      includeEnvVars: true
+
+  # 4. Extract and Collect Issues
+  - task: JFrogCollectBuildIssues@1
+    displayName: 'Collect Tracked Issues'
+    inputs:
+      artifactoryConnection: '$(jfrogPlatformConnection)'
+      buildName: '$(buildName)'
+      buildNumber: '$(buildNumber)'
+      configSource: 'taskConfiguration'
+      cliIssuesConfig: |
+        version: 1
+        issues:
+          trackerName: JIRA
+          regexp: (.+-[0-9]+)\s-\s(.+)
+          keyGroupIndex: 1
+          summaryGroupIndex: 2
+          trackerUrl: https://my-jira.com/issues
+          aggregate: true
+          aggregationStatus: RELEASED
+
+  # 5. Publish Build Info
+  - task: JFrogPublishBuildInfo@1
+    displayName: 'Publish Build Info to Artifactory'
+    inputs:
+      buildName: '$(buildName)'
+      buildNumber: '$(buildNumber)'
+      excludeEnvVars: '*password*;*psw*;*secret*;*key*;*token*;*auth*;'
+
+  # 6. Scan the Published Build
+  - task: JFrogBuildScan@1
+    displayName: 'Scan Published Build (Xray)'
+    inputs:
+      xrayConnection: '$(jfrogXrayConnection)'
+      buildName: '$(buildName)'
+      buildNumber: '$(buildNumber)'
+      allowFailBuild: true

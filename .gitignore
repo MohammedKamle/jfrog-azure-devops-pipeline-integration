@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime / OS
+.DS_Store
+Thumbs.db
+
+# Environment & secrets — never commit tokens
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Coverage / test output
+coverage/
+.nyc_output/
+
+# Build / temp
+dist/
+build/
+tmp/
+temp/
+.cache/
+
+# JFrog CLI local config (if generated in the repo)
+.jfrog/

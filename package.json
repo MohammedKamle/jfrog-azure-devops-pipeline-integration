@@ -1,0 +1,28 @@
+{
+  "name": "jfrog-azure-devops-demo",
+  "version": "1.0.0",
+  "description": "Demo Express.js app showcasing Azure DevOps CI with the JFrog Azure DevOps Extension (Artifactory + Xray)",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "test": "node --test"
+  },
+  "keywords": [
+    "jfrog",
+    "artifactory",
+    "xray",
+    "azure-devops",
+    "express",
+    "demo"
+  ],
+  "author": "JFrog Demo",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "morgan": "^1.10.0"
+  }
+}
