@@ -65,7 +65,7 @@ flowchart TD
 Existing Artifactory repositories used by this demo:
 
 - **`demo-npm`** — npm virtual repository (resolve dependencies)
-- **`jfrog-cli-remote`** — generic remote repository used by `JFrogToolsInstaller` to download the CLI (must proxy `https://releases.jfrog.io/artifactory/jfrog-cli/`)
+- **`jfrog-cli-remote`** — generic remote repository used by `JFrogToolsInstaller` to download the CLI (must proxy `https://releases.jfrog.io/artifactory/jfrog-cli/v2-jf/`)
 
 ---
 
@@ -233,22 +233,32 @@ Use the same access token stored in `~/.zshrc` (`JFROG_TOKEN`). Do not hardcode 
 
 ### JFrog Platform Service Connection
 
+Prefer **JFrog Platform V2** (not Artifactory V2) for this demo. You may already have one named `jfrog-platform`.
+
 | Field | Value |
 |-------|--------|
-| Connection type | **JFrog Artifactory** / **JFrog Platform** (as shown by the extension) |
-| Server URL | `https://mdk96.jfrog.io` (or `https://mdk96.jfrog.io/artifactory` if the UI requires the Artifactory path) |
-| Authentication | Access Token |
+| Connection type | **JFrog Platform V2** |
+| Authentication method | Token Based Authentication |
+| Server URL | `https://mdk96.jfrog.io` (**no trailing slash**, **do not** append `/artifactory`) |
 | Access Token | Value of `JFROG_TOKEN` from `~/.zshrc` |
 | Service connection name | e.g. `jfrog-platform` — **must match** the `jfrogPlatformConnection` pipeline variable |
-| Grant access to all pipelines | Recommended for demos |
+| Grant access to all pipelines | Recommended for demos (check the box) |
+
+Click **Verify** — it should succeed against the platform root URL.
+
+> **If you create “JFrog Artifactory V2” instead**, Azure DevOps calls `{Server URL}/api/plugins`. That requires the Artifactory path:
+> `https://mdk96.jfrog.io/artifactory`
+>
+> Using only `https://mdk96.jfrog.io/` with Artifactory V2 produces:
+> `404` on `https://mdk96.jfrog.io/api/plugins` — the token is fine; the URL type is wrong.
 
 ### JFrog Xray Service Connection
 
 | Field | Value |
 |-------|--------|
-| Connection type | **JFrog Xray** |
-| Server URL | `https://mdk96.jfrog.io` (or `https://mdk96.jfrog.io/xray` if required by the form) |
-| Authentication | Access Token |
+| Connection type | **JFrog Xray V2** |
+| Authentication method | Token Based Authentication |
+| Server URL | `https://mdk96.jfrog.io` (platform root), or `https://mdk96.jfrog.io/xray` if Verify requires the Xray path |
 | Access Token | Same `JFROG_TOKEN` |
 | Service connection name | e.g. `jfrog-xray` — **must match** the `jfrogXrayConnection` pipeline variable |
 | Grant access to all pipelines | Recommended for demos |
@@ -276,8 +286,12 @@ Do **not** change this to `npm-virtual` or create another npm virtual repository
 Also ensure **`jfrog-cli-remote`** exists as a **generic remote** repository whose URL is:
 
 ```text
-https://releases.jfrog.io/artifactory/jfrog-cli/
+https://releases.jfrog.io/artifactory/jfrog-cli/v2-jf/
 ```
+
+> Important: the path must end with **`/v2-jf/`**. The Azure DevOps `JFrogToolsInstaller` downloads  
+> `{repo}/{version}/jfrog-cli-linux-amd64/jf`, so the remote must already be rooted at `v2-jf`.  
+> Using only `.../jfrog-cli/` causes HTTP 404.
 
 `JFrogToolsInstaller@1` downloads the CLI from that repository. If it is missing, ask a JFrog admin to create it (or create it under **Administration → Repositories → Add Repositories → Remote Repository → Generic**).
 
@@ -385,12 +399,13 @@ Tip for demos: keep the Azure DevOps run and the Artifactory build page side-by-
 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
-| Authentication failures in pipeline | Bad/expired token or wrong URL on service connection | Re-copy `JFROG_TOKEN` from `~/.zshrc`; re-verify service connections; URL must be `https://mdk96.jfrog.io` |
+| Authentication failures in pipeline | Bad/expired token or wrong URL on service connection | Re-copy `JFROG_TOKEN` from `~/.zshrc`; re-verify service connections; Platform V2 URL must be `https://mdk96.jfrog.io` (no `/artifactory`) |
+| **Verify failed** on Artifactory V2 (`…/api/plugins` → 404) | Used platform URL with **Artifactory V2** connection type | Either switch to **JFrog Platform V2** + `https://mdk96.jfrog.io`, or keep Artifactory V2 and set URL to `https://mdk96.jfrog.io/artifactory` |
 | Invalid service connection | Name mismatch with pipeline variables | `jfrogPlatformConnection` / `jfrogXrayConnection` must equal the service connection **names** exactly |
 | Repository not found / **`demo-npm` not found** | Wrong `sourceRepo` or missing permissions | Confirm `sourceRepo: 'demo-npm'`; grant the token read access to `demo-npm` |
-| **`jfrog-cli-remote` errors** on ToolsInstaller | Remote repo missing or misconfigured | Create generic remote `jfrog-cli-remote` → `https://releases.jfrog.io/artifactory/jfrog-cli/` |
+| **`jfrog-cli-remote` errors** on ToolsInstaller | Remote URL missing `/v2-jf/` or repo missing | Set remote URL to `https://releases.jfrog.io/artifactory/jfrog-cli/v2-jf/`; token needs Read+Deploy on the remote (for cache) |
 | Xray Watch missing | Watch name typo | Create watch named exactly `security-watch-dev` and attach `demo-npm` |
-| npm install failures | Network, auth, or empty/miswired virtual repo | Check `demo-npm` members (local + remote); verify Platform connection; inspect npm error in the `JFrogNpm` log |
+| npm install failures | Network, auth, empty virtual repo, or **lockfile pinned to another registry** | Confirm `demo-npm` members; check `JFrogNpm` logs. If you see URLs like `jfrogrepo24.jfrog.io` or another host, regenerate `package-lock.json` through `demo-npm` (`jf npm-config --repo-resolve=demo-npm` then `rm package-lock.json && jf npm install`) and push |
 | Build Info not published | Earlier step failed or publish task misconfigured | Ensure `JFrogNpm` ran with `collectBuildInfo: true` and the same `buildName` / `buildNumber` as publish |
 | Xray scan failures | Violations with `allowFailBuild: true`, or Xray connection issue | Review violations in UI; adjust policy for demos or fix vulnerable deps; verify Xray service connection |
 | Local `./scripts/verify-jfrog.sh` fails | Token not loaded | Run `source scripts/load-env.sh` and confirm `JFROG_URL` / `JFROG_TOKEN` |
