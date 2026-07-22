@@ -14,9 +14,11 @@ This repository is a customer-demo blueprint. Push it to GitHub, wire it to Azur
 1. Installs the JFrog CLI from Artifactory (`jfrog-cli-remote`)
 2. Audits project dependencies with Xray (`security-watch-dev`)
 3. Runs `npm install` through Artifactory (`demo-npm`) while collecting build info
-4. Collects tracked issues (JIRA-style commit messages)
-5. Publishes build info to Artifactory
-6. Scans the published build with Xray
+4. Stamps a unique package version (`1.0.<BuildId>`)
+5. Packs and publishes the npm package to **`demo-npm-local`**
+6. Collects tracked issues (JIRA-style commit messages)
+7. Publishes build info to Artifactory
+8. Scans the published build with Xray
 
 The sample app is intentionally small so demos stay focused on the JFrog + Azure DevOps integration, not application complexity.
 
@@ -43,7 +45,8 @@ flowchart TD
 | Install | JFrog CLI | Pipeline agents get CLI from `jfrog-cli-remote` |
 | Audit | Xray | Local dependency tree checked against `security-watch-dev` |
 | Resolve | Artifactory | `npm install` via virtual repo `demo-npm` |
-| Publish | Build Info | Metadata (deps, env, issues) stored in Artifactory |
+| Deploy | Artifactory | Pack & publish package to local repo `demo-npm-local` |
+| Publish | Build Info | Metadata (deps, artifacts, env, issues) stored in Artifactory |
 | Scan | Xray | Published build scanned for policy violations |
 
 ---
@@ -65,6 +68,7 @@ flowchart TD
 Existing Artifactory repositories used by this demo:
 
 - **`demo-npm`** — npm virtual repository (resolve dependencies)
+- **`demo-npm-local`** — npm local repository (publish the built package)
 - **`jfrog-cli-remote`** — generic remote repository used by `JFrogToolsInstaller` to download the CLI (must proxy `https://releases.jfrog.io/artifactory/jfrog-cli/v2-jf/`)
 
 ---
@@ -269,19 +273,27 @@ After creating both connections, click **Verify** / **Verify connection** if ava
 
 ## 11. Configure Artifactory
 
-This demo uses the **existing** npm virtual repository:
+This demo uses the **existing** npm repositories:
 
 | Repository | Type | Role |
 |------------|------|------|
 | **`demo-npm`** | Virtual (npm) | Resolve all pipeline `npm install` traffic |
+| **`demo-npm-local`** | Local (npm) | Receive the packed package from `pack and publish` |
+| **`demo-npm-remote`** | Remote (npm) | Proxy upstream npm (member of `demo-npm`) |
 
-The pipeline task `JFrogNpm@1` is configured with:
+The pipeline resolves with:
 
 ```yaml
 sourceRepo: 'demo-npm'
 ```
 
-Do **not** change this to `npm-virtual` or create another npm virtual repository for this demo.
+And publishes with:
+
+```yaml
+targetRepo: 'demo-npm-local'   # or $(targetRepo)
+```
+
+Do **not** change the resolve repo to `npm-virtual` or create another npm virtual repository for this demo.
 
 Also ensure **`jfrog-cli-remote`** exists as a **generic remote** repository whose URL is:
 
@@ -338,10 +350,11 @@ Open **Pipelines → your pipeline → Edit → Variables** (or use a Variable G
 
 | Variable | Example value | Notes |
 |----------|---------------|-------|
-| `jfrogPlatformConnection` | `jfrog-platform` | Exact name of the Platform service connection |
+| `jfrogPlatformConnection` | `jfrog-platform` | Exact name of the Platform/Artifactory service connection |
 | `jfrogXrayConnection` | `jfrog-xray` | Exact name of the Xray service connection |
 | `buildName` | `jfrog-azure-devops-demo` | Appears under Artifactory Builds |
 | `buildNumber` | `$(Build.BuildId)` | Unique per Azure DevOps run |
+| `targetRepo` | `demo-npm-local` | Local npm repo that receives the published package |
 
 `azure-pipelines.yml` already defines sensible defaults for these. Override them in the Azure DevOps UI when your service connection names differ.
 
@@ -369,9 +382,11 @@ Trigger by pushing a commit to GitHub, or click **Run pipeline** in Azure DevOps
 | 1 | **Install JFrog CLI & Tools** (`JFrogToolsInstaller`) | CLI downloaded from `jfrog-cli-remote` and available on the agent |
 | 2 | **Audit Project Dependencies (Xray)** (`JFrogAudit`) | Shift-left scan against watch `security-watch-dev` |
 | 3 | **NPM Install & Collect Build Info** (`JFrogNpm`) | Dependencies resolved from `demo-npm`; build info collected locally |
-| 4 | **Collect Tracked Issues** (`JFrogCollectIssues`) | JIRA-style keys scraped from commit messages into build info |
-| 5 | **Publish Build Info to Artifactory** (`JFrogPublishBuildInfo`) | Build appears under Artifactory → Builds |
-| 6 | **Scan Published Build (Xray)** (`JFrogBuildScan`) | Xray scans the published build; may fail the job if `allowFailBuild` + violations |
+| 4 | **Stamp Unique Package Version** | `package.json` version set to `1.0.<BuildId>` |
+| 5 | **Pack & Publish to demo-npm-local** (`JFrogNpm`) | `.tgz` published to Artifactory local repo `demo-npm-local` |
+| 6 | **Collect Tracked Issues** (`JFrogCollectIssues`) | JIRA-style keys scraped from commit messages into build info |
+| 7 | **Publish Build Info to Artifactory** (`JFrogPublishBuildInfo`) | Build appears under Artifactory → Builds |
+| 8 | **Scan Published Build (Xray)** (`JFrogBuildScan`) | Xray scans the published build; may fail the job if `allowFailBuild` + violations |
 
 `allowFailBuild: true` on audit/scan means policy violations can fail the pipeline — useful for realistic security demos.
 
@@ -383,9 +398,11 @@ Open [https://mdk96.jfrog.io/](https://mdk96.jfrog.io/) and verify each artifact
 
 | What to verify | Where in the JFrog Platform |
 |----------------|-----------------------------|
+| **Published package** | Artifactory → **Artifacts** → `demo-npm-local` → `jfrog-azure-devops-demo/-/jfrog-azure-devops-demo-1.0.<BuildId>.tgz` |
 | **Dependency Audit** | Xray → Scans / Watch `security-watch-dev` results for the run |
 | **Build Info** | Artifactory → **Builds** → `jfrog-azure-devops-demo` → select the build number (`Build.BuildId`) |
 | **Dependencies** | Inside the build → **Modules / Dependencies** (packages resolved via `demo-npm`) |
+| **Published modules** | Inside the build → **Modules** (the npm package published to `demo-npm-local`) |
 | **Environment Variables** | Inside the build → **Environment** (secrets matching `*password*;*token*;…` are excluded) |
 | **Issues** | Inside the build → **Issues** (populated when commit messages match the JIRA regexp) |
 | **Xray Scan Results** | Build page → **Xray** / Security data, or Xray → Builds |
@@ -406,6 +423,7 @@ Tip for demos: keep the Azure DevOps run and the Artifactory build page side-by-
 | **`jfrog-cli-remote` errors** on ToolsInstaller | Remote URL missing `/v2-jf/` or repo missing | Set remote URL to `https://releases.jfrog.io/artifactory/jfrog-cli/v2-jf/`; token needs Read+Deploy on the remote (for cache) |
 | Xray Watch missing | Watch name typo | Create watch named exactly `security-watch-dev` and attach `demo-npm` |
 | npm install failures | Network, auth, empty virtual repo, or **lockfile pinned to another registry** | Confirm `demo-npm` members; check `JFrogNpm` logs. If you see URLs like `jfrogrepo24.jfrog.io` or another host, regenerate `package-lock.json` through `demo-npm` (`jf npm-config --repo-resolve=demo-npm` then `rm package-lock.json && jf npm install`) and push |
+| npm publish failures | Missing Deploy permission, wrong `targetRepo`, or version already exists | Grant Deploy on `demo-npm-local`; confirm `targetRepo: demo-npm-local`; version stamping (`1.0.$(Build.BuildId)`) should avoid collisions |
 | Build Info not published | Earlier step failed or publish task misconfigured | Ensure `JFrogNpm` ran with `collectBuildInfo: true` and the same `buildName` / `buildNumber` as publish |
 | Xray scan failures | Violations with `allowFailBuild: true`, or Xray connection issue | Review violations in UI; adjust policy for demos or fix vulnerable deps; verify Xray service connection |
 | Local `./scripts/verify-jfrog.sh` fails | Token not loaded | Run `source scripts/load-env.sh` and confirm `JFROG_URL` / `JFROG_TOKEN` |

@@ -6,6 +6,7 @@
 #   - jfrogXrayConnection      → name of the JFrog Xray service connection
 #   - buildName                → Artifactory build name (e.g. jfrog-azure-devops-demo)
 #   - buildNumber              → Artifactory build number (often $(Build.BuildId))
+#   - targetRepo               → npm local repo for publish (demo-npm-local)
 
 trigger:
   branches:
@@ -31,6 +32,8 @@ variables:
   buildName: 'jfrog-azure-devops-demo'
   # Prefer the Azure DevOps build ID so every run gets a unique Artifactory build number
   buildNumber: '$(Build.BuildId)'
+  # Local npm repository where the built package is published
+  targetRepo: 'demo-npm-local'
 
 steps:
   # 1. Install JFrog CLI and Tools
@@ -61,7 +64,26 @@ steps:
       buildNumber: '$(buildNumber)'
       includeEnvVars: true
 
-  # 4. Extract and Collect Issues
+  # 4. Stamp a unique version so each pipeline run can publish without colliding
+  - script: |
+      set -euo pipefail
+      NEW_VERSION="1.0.$(Build.BuildId)"
+      npm version "${NEW_VERSION}" --no-git-tag-version
+      echo "Publishing package version: ${NEW_VERSION}"
+    displayName: 'Stamp Unique Package Version'
+
+  # 5. Pack & Publish the package to Artifactory local repo
+  - task: JFrogNpm@1
+    displayName: 'Pack & Publish to demo-npm-local'
+    inputs:
+      command: 'pack and publish'
+      artifactoryConnection: '$(jfrogPlatformConnection)'
+      targetRepo: '$(targetRepo)'
+      collectBuildInfo: true
+      buildName: '$(buildName)'
+      buildNumber: '$(buildNumber)'
+
+  # 6. Extract and Collect Issues
   # Task ID is JFrogCollectIssues (friendly name: "JFrog Collect Build Issues")
   - task: JFrogCollectIssues@1
     displayName: 'Collect Tracked Issues'
@@ -81,7 +103,7 @@ steps:
           aggregate: true
           aggregationStatus: RELEASED
 
-  # 5. Publish Build Info
+  # 7. Publish Build Info
   - task: JFrogPublishBuildInfo@1
     displayName: 'Publish Build Info to Artifactory'
     inputs:
@@ -90,7 +112,7 @@ steps:
       buildNumber: '$(buildNumber)'
       excludeEnvVars: '*password*;*psw*;*secret*;*key*;*token*;*auth*;'
 
-  # 6. Scan the Published Build
+  # 8. Scan the Published Build
   - task: JFrogBuildScan@1
     displayName: 'Scan Published Build (Xray)'
     inputs:

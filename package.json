@@ -21,6 +21,11 @@
   "engines": {
     "node": ">=18"
   },
+  "files": [
+    "index.js",
+    "routes/**/*.js",
+    "README.md"
+  ],
   "dependencies": {
     "express": "^4.21.2",
     "morgan": "^1.10.0"
