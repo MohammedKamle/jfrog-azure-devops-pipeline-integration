@@ -1,6 +1,6 @@
 # Dependencies
 node_modules/
-
+demo-video/
 # Logs
 logs/
 *.log
